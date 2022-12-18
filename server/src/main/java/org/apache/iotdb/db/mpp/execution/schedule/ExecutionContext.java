@@ -25,14 +25,14 @@ import io.airlift.units.Duration;
 
 /** The execution context of a {@link DriverTask} */
 public class ExecutionContext {
-  private CpuTimer.CpuDuration cpuDuration;
+  private long cpuDuration;
   private Duration timeSlice;
 
-  public CpuTimer.CpuDuration getCpuDuration() {
+  public long getCpuDuration() {
     return cpuDuration;
   }
 
-  public void setCpuDuration(CpuTimer.CpuDuration cpuDuration) {
+  public void setCpuDuration(long cpuDuration) {
     this.cpuDuration = cpuDuration;
   }
 

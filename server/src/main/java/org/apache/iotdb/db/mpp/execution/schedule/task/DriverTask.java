@@ -102,9 +102,7 @@ public class DriverTask implements IDIndexedAccessible {
 
     // 1. The penalty factor means that if a task executes less time in one schedule, it will have a
     // high schedule priority
-    double penaltyFactor =
-        context.getCpuDuration().getWall().getValue(TimeUnit.NANOSECONDS)
-            / context.getTimeSlice().getValue(TimeUnit.NANOSECONDS);
+    double penaltyFactor = context.getCpuDuration() / context.getTimeSlice().getValue(TimeUnit.NANOSECONDS);
     // 2. If a task is nearly timeout, it should be scheduled as soon as possible.
     long base = System.currentTimeMillis() - ddl;
 

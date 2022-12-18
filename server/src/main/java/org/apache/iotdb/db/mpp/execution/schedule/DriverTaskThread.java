@@ -60,9 +60,10 @@ public class DriverTaskThread extends AbstractDriverThread {
       return;
     }
     IDriver instance = task.getFragmentInstance();
-    CpuTimer timer = new CpuTimer();
+    long startTime = System.nanoTime();
+//    CpuTimer timer = new CpuTimer();
     ListenableFuture<?> future = instance.processFor(EXECUTION_TIME_SLICE);
-    CpuTimer.CpuDuration duration = timer.elapsedTime();
+//    CpuTimer.CpuDuration duration = timer.elapsedTime();
     // long cost = System.nanoTime() - startTime;
     // If the future is cancelled, the task is in an error and should be thrown.
     if (future.isCancelled()) {
@@ -71,7 +72,7 @@ public class DriverTaskThread extends AbstractDriverThread {
       return;
     }
     ExecutionContext context = new ExecutionContext();
-    context.setCpuDuration(duration);
+    context.setCpuDuration(System.nanoTime() - startTime);
     context.setTimeSlice(EXECUTION_TIME_SLICE);
     if (instance.isFinished()) {
       scheduler.runningToFinished(task, context);

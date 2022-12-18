@@ -88,7 +88,7 @@ public class LocalSourceHandle implements ISourceHandle {
 
   @Override
   public TsBlock receive() {
-    try (SetThreadName sourceHandleName = new SetThreadName(threadName)) {
+//    try (SetThreadName sourceHandleName = new SetThreadName(threadName)) {
       checkState();
 
       if (!queue.isBlocked().isDone()) {
@@ -107,7 +107,7 @@ public class LocalSourceHandle implements ISourceHandle {
       }
       checkAndInvokeOnFinished();
       return tsBlock;
-    }
+//    }
   }
 
   @Override
