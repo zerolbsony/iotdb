@@ -88,26 +88,26 @@ public class LocalSourceHandle implements ISourceHandle {
 
   @Override
   public TsBlock receive() {
-//    try (SetThreadName sourceHandleName = new SetThreadName(threadName)) {
-      checkState();
+    //    try (SetThreadName sourceHandleName = new SetThreadName(threadName)) {
+    checkState();
 
-      if (!queue.isBlocked().isDone()) {
-        throw new IllegalStateException("Source handle is blocked.");
-      }
-      TsBlock tsBlock;
-      synchronized (queue) {
-        tsBlock = queue.remove();
-      }
-      if (tsBlock != null) {
-        logger.debug(
-            "[GetTsBlockFromQueue] TsBlock:{} size:{}",
-            currSequenceId,
-            tsBlock.getRetainedSizeInBytes());
-        currSequenceId++;
-      }
-      checkAndInvokeOnFinished();
-      return tsBlock;
-//    }
+    if (!queue.isBlocked().isDone()) {
+      throw new IllegalStateException("Source handle is blocked.");
+    }
+    TsBlock tsBlock;
+    synchronized (queue) {
+      tsBlock = queue.remove();
+    }
+    if (tsBlock != null) {
+      logger.debug(
+          "[GetTsBlockFromQueue] TsBlock:{} size:{}",
+          currSequenceId,
+          tsBlock.getRetainedSizeInBytes());
+      currSequenceId++;
+    }
+    checkAndInvokeOnFinished();
+    return tsBlock;
+    //    }
   }
 
   @Override

@@ -24,7 +24,6 @@ import org.apache.iotdb.db.mpp.execution.driver.IDriver;
 import org.apache.iotdb.db.mpp.execution.schedule.queue.IndexedBlockingQueue;
 import org.apache.iotdb.db.mpp.execution.schedule.task.DriverTask;
 import org.apache.iotdb.db.utils.SetThreadName;
-import org.apache.iotdb.db.utils.stats.CpuTimer;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.Duration;
@@ -61,9 +60,9 @@ public class DriverTaskThread extends AbstractDriverThread {
     }
     IDriver instance = task.getFragmentInstance();
     long startTime = System.nanoTime();
-//    CpuTimer timer = new CpuTimer();
+    //    CpuTimer timer = new CpuTimer();
     ListenableFuture<?> future = instance.processFor(EXECUTION_TIME_SLICE);
-//    CpuTimer.CpuDuration duration = timer.elapsedTime();
+    //    CpuTimer.CpuDuration duration = timer.elapsedTime();
     // long cost = System.nanoTime() - startTime;
     // If the future is cancelled, the task is in an error and should be thrown.
     if (future.isCancelled()) {

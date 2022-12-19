@@ -1,4 +1,4 @@
-///*
+/// *
 // * Licensed to the Apache Software Foundation (ASF) under one
 // * or more contributor license agreements.  See the NOTICE file
 // * distributed with this work for additional information
@@ -16,30 +16,30 @@
 // * specific language governing permissions and limitations
 // * under the License.
 // */
-//package org.apache.iotdb.db.mpp.execution.schedule;
+// package org.apache.iotdb.db.mpp.execution.schedule;
 //
-//import org.apache.iotdb.db.mpp.common.FragmentInstanceId;
-//import org.apache.iotdb.db.mpp.common.PlanFragmentId;
-//import org.apache.iotdb.db.mpp.common.QueryId;
-//import org.apache.iotdb.db.mpp.execution.driver.IDriver;
-//import org.apache.iotdb.db.mpp.execution.exchange.IMPPDataExchangeManager;
-//import org.apache.iotdb.db.mpp.execution.schedule.task.DriverTask;
-//import org.apache.iotdb.db.mpp.execution.schedule.task.DriverTaskStatus;
-//import org.apache.iotdb.db.utils.stats.CpuTimer;
-//import org.apache.iotdb.mpp.rpc.thrift.IDataNodeRPCService;
+// import org.apache.iotdb.db.mpp.common.FragmentInstanceId;
+// import org.apache.iotdb.db.mpp.common.PlanFragmentId;
+// import org.apache.iotdb.db.mpp.common.QueryId;
+// import org.apache.iotdb.db.mpp.execution.driver.IDriver;
+// import org.apache.iotdb.db.mpp.execution.exchange.IMPPDataExchangeManager;
+// import org.apache.iotdb.db.mpp.execution.schedule.task.DriverTask;
+// import org.apache.iotdb.db.mpp.execution.schedule.task.DriverTaskStatus;
+// import org.apache.iotdb.db.utils.stats.CpuTimer;
+// import org.apache.iotdb.mpp.rpc.thrift.IDataNodeRPCService;
 //
-//import io.airlift.units.Duration;
-//import org.junit.After;
-//import org.junit.Assert;
-//import org.junit.Test;
-//import org.mockito.Mockito;
+// import io.airlift.units.Duration;
+// import org.junit.After;
+// import org.junit.Assert;
+// import org.junit.Test;
+// import org.mockito.Mockito;
 //
-//import java.io.IOException;
-//import java.util.HashSet;
-//import java.util.Set;
-//import java.util.concurrent.TimeUnit;
+// import java.io.IOException;
+// import java.util.HashSet;
+// import java.util.Set;
+// import java.util.concurrent.TimeUnit;
 //
-//public class DefaultDriverSchedulerTest {
+// public class DefaultDriverSchedulerTest {
 //
 //  private final DriverScheduler manager = DriverScheduler.getInstance();
 //
@@ -404,4 +404,4 @@
 //    manager.getReadyQueue().clear();
 //    manager.getTimeoutQueue().clear();
 //  }
-//}
+// }
