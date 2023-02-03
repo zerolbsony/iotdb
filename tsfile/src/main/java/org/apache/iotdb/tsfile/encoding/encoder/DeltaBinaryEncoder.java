@@ -26,6 +26,7 @@ import org.apache.iotdb.tsfile.utils.ReadWriteIOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
@@ -45,7 +46,7 @@ import java.io.IOException;
  */
 public abstract class DeltaBinaryEncoder extends Encoder {
 
-  protected static final int BLOCK_DEFAULT_SIZE = 128;
+  protected static final int BLOCK_DEFAULT_SIZE = 256;
   private static final Logger logger = LoggerFactory.getLogger(DeltaBinaryEncoder.class);
   protected ByteArrayOutputStream out;
   protected int blockSize;
@@ -85,6 +86,7 @@ public abstract class DeltaBinaryEncoder extends Encoder {
   }
 
   private void writeHeaderToBytes() throws IOException {
+
     ReadWriteIOUtils.write(writeIndex, out);
     ReadWriteIOUtils.write(writeWidth, out);
     writeHeader();
@@ -100,7 +102,9 @@ public abstract class DeltaBinaryEncoder extends Encoder {
     for (int i = 0; i < writeIndex; i++) {
       calcTwoDiff(i);
     }
+
     writeWidth = calculateBitWidthsForDeltaBlockBuffer();
+    //    System.out.println(writeWidth);
     writeHeaderToBytes();
     writeDataWithMinWidth();
 
@@ -112,6 +116,7 @@ public abstract class DeltaBinaryEncoder extends Encoder {
   @Override
   public void flush(ByteArrayOutputStream out) {
     try {
+
       flushBlockBuffer(out);
     } catch (IOException e) {
       logger.error("flush data to stream failed!", e);
@@ -173,6 +178,7 @@ public abstract class DeltaBinaryEncoder extends Encoder {
       }
       calcDelta(value);
       previousValue = value;
+
       if (writeIndex == blockSize) {
         flush(out);
       }

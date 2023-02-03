@@ -82,7 +82,7 @@ public class TSFileConfig implements Serializable {
   /** Max length limitation of input string. */
   private int maxStringLength = 128;
   /** Floating-point precision. */
-  private int floatPrecision = 2;
+  private int floatPrecision = 5;
   /**
    * Encoder of time column, TsFile supports TS_2DIFF, PLAIN and RLE(run-length encoding) Default
    * value is TS_2DIFF.
@@ -99,6 +99,8 @@ public class TSFileConfig implements Serializable {
   private int rleBitWidth = 8;
   /** Default block size of two-diff. delta encoding is 128 */
   private int deltaBlockSize = 128;
+  /** Default predict method for Sprintz encoding scheme * */
+  private String sprintzPredictScheme = "delta";
   /** Default frequency type is SINGLE_FREQ. */
   private String freqType = "SINGLE_FREQ";
   /** Default PLA max error is 100. */
@@ -201,6 +203,7 @@ public class TSFileConfig implements Serializable {
   }
 
   public int getFloatPrecision() {
+    System.out.println(floatPrecision);
     return floatPrecision;
   }
 
@@ -242,6 +245,14 @@ public class TSFileConfig implements Serializable {
 
   public void setDeltaBlockSize(int deltaBlockSize) {
     this.deltaBlockSize = deltaBlockSize;
+  }
+
+  public String getSprintzPredictScheme() {
+    return sprintzPredictScheme;
+  }
+
+  public void setSprintzPredictScheme(String scheme) {
+    this.sprintzPredictScheme = scheme;
   }
 
   public String getFreqType() {
