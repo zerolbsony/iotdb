@@ -22,6 +22,7 @@ import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.commons.auth.AuthException;
 import org.apache.iotdb.commons.concurrent.IoTDBThreadPoolFactory;
+import org.apache.iotdb.commons.concurrent.threadpool.ScheduledExecutorUtil;
 import org.apache.iotdb.commons.conf.CommonDescriptor;
 import org.apache.iotdb.commons.consensus.ConsensusGroupId;
 import org.apache.iotdb.commons.file.SystemFileFactory;
@@ -65,8 +66,11 @@ public class ConfigNodeRegionStateMachine
   private static final ConfigNodeConfig CONF = ConfigNodeDescriptor.getInstance().getConf();
   private final ConfigPlanExecutor executor;
   private ConfigManager configManager;
-  private LogWriter logWriter;
-  private File logFile;
+
+  /** Variables for ConfigNode Simple Consensus */
+  private LogWriter simpleLogWriter;
+
+  private File simpleLogFile;
   private int startIndex;
   private int endIndex;
   private ScheduledExecutorService executorService;
@@ -271,21 +275,22 @@ public class ConfigNodeRegionStateMachine
 
   /** TODO optimize the lock usage */
   private synchronized void writeLogForSimpleConsensus(ConfigPhysicalPlan plan) {
-    if (logFile.length() > LOG_FILE_MAX_SIZE) {
+    if (simpleLogFile.length() > LOG_FILE_MAX_SIZE) {
       try {
-        logWriter.force();
+        simpleLogWriter.force();
         File completedFilePath = new File(FILE_PATH + startIndex + "_" + endIndex);
-        Files.move(logFile.toPath(), completedFilePath.toPath(), StandardCopyOption.ATOMIC_MOVE);
+        Files.move(
+            simpleLogFile.toPath(), completedFilePath.toPath(), StandardCopyOption.ATOMIC_MOVE);
       } catch (IOException e) {
         LOGGER.error("Can't force logWriter for ConfigNode SimpleConsensus mode", e);
       }
       for (int retry = 0; retry < 5; retry++) {
         try {
-          logWriter.close();
+          simpleLogWriter.close();
         } catch (IOException e) {
           LOGGER.warn(
               "Can't close StandAloneLog for ConfigNode SimpleConsensus mode, filePath: {}, retry: {}",
-              logFile.getAbsolutePath(),
+              simpleLogFile.getAbsolutePath(),
               retry);
           try {
             // Sleep 1s and retry
@@ -305,7 +310,7 @@ public class ConfigNodeRegionStateMachine
     try {
       ByteBuffer buffer = plan.serializeToByteBuffer();
       buffer.position(buffer.limit());
-      logWriter.write(buffer);
+      simpleLogWriter.write(buffer);
 
       endIndex = endIndex + 1;
     } catch (Exception e) {
@@ -352,18 +357,38 @@ public class ConfigNodeRegionStateMachine
     }
     startIndex = startIndex + 1;
     createLogFile(endIndex);
+
+    ScheduledExecutorService simpleConsensusThread =
+        IoTDBThreadPoolFactory.newSingleThreadScheduledExecutor(
+            "ConfigNode-Simple-Consensus-WAL-Flush-Thread");
+    ScheduledExecutorUtil.safelyScheduleWithFixedDelay(
+        simpleConsensusThread,
+        this::flushWALForSimpleConsensus,
+        0,
+        CONF.getForceWalPeriodForConfigNodeSimpleInMs(),
+        TimeUnit.MILLISECONDS);
+  }
+
+  private void flushWALForSimpleConsensus() {
+    if (simpleLogWriter != null) {
+      try {
+        simpleLogWriter.force();
+      } catch (IOException e) {
+        LOGGER.error("Can't force logWriter for ConfigNode flushWALForSimpleConsensus", e);
+      }
+    }
   }
 
   private void createLogFile(int endIndex) {
-    logFile = SystemFileFactory.INSTANCE.getFile(PROGRESS_FILE_PATH + endIndex);
+    simpleLogFile = SystemFileFactory.INSTANCE.getFile(PROGRESS_FILE_PATH + endIndex);
     try {
-      logFile.createNewFile();
-      logWriter = new LogWriter(logFile, false);
-      LOGGER.info("Create ConfigNode SimpleConsensusFile: {}", logFile.getAbsolutePath());
+      simpleLogFile.createNewFile();
+      simpleLogWriter = new LogWriter(simpleLogFile, false);
+      LOGGER.info("Create ConfigNode SimpleConsensusFile: {}", simpleLogFile.getAbsolutePath());
     } catch (Exception e) {
       LOGGER.warn(
           "Create ConfigNode SimpleConsensusFile failed, filePath: {}",
-          logFile.getAbsolutePath(),
+          simpleLogFile.getAbsolutePath(),
           e);
     }
   }
