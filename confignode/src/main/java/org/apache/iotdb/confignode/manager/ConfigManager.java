@@ -780,7 +780,6 @@ public class ConfigManager implements IManager {
         partitionManager.getOrCreateDataPartition(getOrCreateDataPartitionPlan);
     resp = queryResult.convertToTDataPartitionTableResp();
 
-
     if (CONF.isEnablePrintingNewlyCreatedPartition()) {
       printNewCreatedDataPartition(getOrCreateDataPartitionPlan, resp);
     }
