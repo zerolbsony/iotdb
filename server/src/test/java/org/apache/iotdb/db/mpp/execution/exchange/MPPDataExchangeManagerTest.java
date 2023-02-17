@@ -23,6 +23,10 @@ import org.apache.iotdb.common.rpc.thrift.TEndPoint;
 import org.apache.iotdb.commons.client.ClientPoolFactory;
 import org.apache.iotdb.commons.client.IClientManager;
 import org.apache.iotdb.commons.client.sync.SyncDataNodeMPPDataExchangeServiceClient;
+import org.apache.iotdb.db.mpp.execution.exchange.sink.ISinkHandle;
+import org.apache.iotdb.db.mpp.execution.exchange.sink.LocalSinkHandle;
+import org.apache.iotdb.db.mpp.execution.exchange.source.ISourceHandle;
+import org.apache.iotdb.db.mpp.execution.exchange.source.LocalSourceHandle;
 import org.apache.iotdb.db.mpp.execution.fragment.FragmentInstanceContext;
 import org.apache.iotdb.db.mpp.execution.memory.LocalMemoryManager;
 import org.apache.iotdb.db.mpp.execution.memory.MemoryPool;
@@ -68,7 +72,7 @@ public class MPPDataExchangeManagerTest {
 
     ISourceHandle localSourceHandle =
         mppDataExchangeManager.createLocalSourceHandleForFragment(
-            remoteFragmentInstanceId, remotePlanNodeId, localFragmentInstanceId, t -> {});
+            remoteFragmentInstanceId, remotePlanNodeId, localFragmentInstanceId, 0, t -> {});
 
     Assert.assertTrue(localSourceHandle instanceof LocalSourceHandle);
 
@@ -101,7 +105,7 @@ public class MPPDataExchangeManagerTest {
 
     ISourceHandle localSourceHandle =
         mppDataExchangeManager.createLocalSourceHandleForFragment(
-            localFragmentInstanceId, localPlanNodeId, remoteFragmentInstanceId, t -> {});
+            localFragmentInstanceId, localPlanNodeId, remoteFragmentInstanceId, 0, t -> {});
 
     Assert.assertTrue(localSourceHandle instanceof LocalSourceHandle);
 

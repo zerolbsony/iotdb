@@ -17,9 +17,10 @@
  * under the License.
  */
 
-package org.apache.iotdb.db.mpp.execution.exchange;
+package org.apache.iotdb.db.mpp.execution.exchange.sink;
 
 import org.apache.iotdb.db.mpp.execution.exchange.MPPDataExchangeManager.SinkHandleListener;
+import org.apache.iotdb.db.mpp.execution.exchange.SharedTsBlockQueue;
 import org.apache.iotdb.db.mpp.metric.QueryMetricsManager;
 import org.apache.iotdb.mpp.rpc.thrift.TFragmentInstanceId;
 import org.apache.iotdb.tsfile.read.common.block.TsBlock;
@@ -29,15 +30,14 @@ import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.util.concurrent.Futures.nonCancellationPropagating;
 import static org.apache.iotdb.db.mpp.metric.DataExchangeCostMetricSet.SINK_HANDLE_SEND_TSBLOCK_LOCAL;
 
-public class LocalSinkHandle implements ISinkHandle {
+public class LocalSinkHandle implements ISinkHandle, ISinkChannel {
 
-  private static final Logger logger = LoggerFactory.getLogger(LocalSinkHandle.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LocalSinkHandle.class);
 
   private TFragmentInstanceId localFragmentInstanceId;
   private final SinkHandleListener sinkHandleListener;
@@ -46,6 +46,8 @@ public class LocalSinkHandle implements ISinkHandle {
   private volatile ListenableFuture<Void> blocked;
   private boolean aborted = false;
   private boolean closed = false;
+
+  private boolean noMoreTsBlocks = false;
 
   private static final QueryMetricsManager QUERY_METRICS = QueryMetricsManager.getInstance();
 
@@ -122,7 +124,7 @@ public class LocalSinkHandle implements ISinkHandle {
         if (queue.hasNoMoreTsBlocks()) {
           return;
         }
-        logger.debug("[StartSendTsBlockOnLocal]");
+        LOGGER.debug("[StartSendTsBlockOnLocal]");
         synchronized (this) {
           blocked = queue.add(tsBlock);
         }
@@ -134,15 +136,11 @@ public class LocalSinkHandle implements ISinkHandle {
   }
 
   @Override
-  public synchronized void send(int partition, List<TsBlock> tsBlocks) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public void setNoMoreTsBlocks() {
     synchronized (queue) {
       synchronized (this) {
-        logger.debug("[StartSetNoMoreTsBlocksOnLocal]");
+        LOGGER.debug("[StartSetNoMoreTsBlocksOnLocal]");
+        noMoreTsBlocks = true;
         if (aborted || closed) {
           return;
         }
@@ -151,12 +149,12 @@ public class LocalSinkHandle implements ISinkHandle {
       }
     }
     checkAndInvokeOnFinished();
-    logger.debug("[EndSetNoMoreTsBlocksOnLocal]");
+    LOGGER.debug("[EndSetNoMoreTsBlocksOnLocal]");
   }
 
   @Override
   public void abort() {
-    logger.debug("[StartAbortLocalSinkHandle]");
+    LOGGER.debug("[StartAbortLocalSinkHandle]");
     synchronized (queue) {
       synchronized (this) {
         if (aborted || closed) {
@@ -171,12 +169,12 @@ public class LocalSinkHandle implements ISinkHandle {
         }
       }
     }
-    logger.debug("[EndAbortLocalSinkHandle]");
+    LOGGER.debug("[EndAbortLocalSinkHandle]");
   }
 
   @Override
   public void close() {
-    logger.debug("[StartCloseLocalSinkHandle]");
+    LOGGER.debug("[StartCloseLocalSinkHandle]");
     synchronized (queue) {
       synchronized (this) {
         if (aborted || closed) {
@@ -187,7 +185,7 @@ public class LocalSinkHandle implements ISinkHandle {
         sinkHandleListener.onFinish(this);
       }
     }
-    logger.debug("[EndCloseLocalSinkHandle]");
+    LOGGER.debug("[EndCloseLocalSinkHandle]");
   }
 
   public SharedTsBlockQueue getSharedTsBlockQueue() {
@@ -207,4 +205,26 @@ public class LocalSinkHandle implements ISinkHandle {
     // do nothing, the maxBytesCanReserve of SharedTsBlockQueue should be set by corresponding
     // LocalSourceHandle
   }
+
+  // region ============ ISinkChannel related ============
+
+  @Override
+  public void open() {}
+
+  @Override
+  public boolean isNoMoreTsBlocks() {
+    return noMoreTsBlocks;
+  }
+
+  @Override
+  public long getRetainedSizeInBytes() {
+    return queue.getBufferRetainedSizeInBytes();
+  }
+
+  @Override
+  public int getNumOfBufferedTsBlocks() {
+    return queue.getNumOfBufferedTsBlocks();
+  }
+
+  // end region
 }
