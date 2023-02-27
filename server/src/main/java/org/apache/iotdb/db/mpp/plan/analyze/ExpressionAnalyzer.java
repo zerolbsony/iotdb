@@ -24,7 +24,7 @@ import org.apache.iotdb.commons.exception.IllegalPathException;
 import org.apache.iotdb.commons.path.MeasurementPath;
 import org.apache.iotdb.commons.path.PartialPath;
 import org.apache.iotdb.commons.path.PathPatternTree;
-import org.apache.iotdb.commons.udf.builtin.BuiltinScalarFunction;
+import org.apache.iotdb.commons.udf.builtin.BuiltinFunction;
 import org.apache.iotdb.db.constant.SqlConstant;
 import org.apache.iotdb.db.exception.sql.SemanticException;
 import org.apache.iotdb.db.mpp.common.header.ColumnHeader;
@@ -73,6 +73,7 @@ import static org.apache.iotdb.db.mpp.plan.analyze.ExpressionUtils.reconstructTi
 import static org.apache.iotdb.db.mpp.plan.analyze.ExpressionUtils.reconstructTimeSeriesOperands;
 import static org.apache.iotdb.db.mpp.plan.analyze.ExpressionUtils.reconstructUnaryExpression;
 import static org.apache.iotdb.db.mpp.plan.analyze.ExpressionUtils.reconstructUnaryExpressions;
+import static org.apache.iotdb.db.utils.TypeInferenceUtils.bindTypeForAggregationNonSeriesInputExpressions;
 
 public class ExpressionAnalyzer {
   /**
@@ -268,6 +269,18 @@ public class ExpressionAnalyzer {
       for (Expression suffixExpression : expression.getExpressions()) {
         extendedExpressions.add(
             concatExpressionWithSuffixPaths(suffixExpression, prefixPaths, patternTree));
+
+        // We just process first input Expression of AggregationFunction,
+        // keep other input Expressions as origin
+        // If AggregationFunction need more than one input series,
+        // we need to reconsider the process of it
+        if (expression.isBuiltInAggregationFunctionExpression()) {
+          List<Expression> children = expression.getExpressions();
+          for (int i = 1; i < children.size(); i++) {
+            extendedExpressions.add(Collections.singletonList(children.get(i)));
+          }
+          break;
+        }
       }
       List<List<Expression>> childExpressionsList = new ArrayList<>();
       cartesianProduct(extendedExpressions, childExpressionsList, 0, new ArrayList<>());
@@ -456,6 +469,17 @@ public class ExpressionAnalyzer {
           return Collections.emptyList();
         }
         extendedExpressions.add(actualExpressions);
+
+        // We just process first input Expression of AggregationFunction,
+        // keep other input Expressions as origin and bind Type
+        // If AggregationFunction need more than one input series,
+        // we need to reconsider the process of it
+        if (expression.isBuiltInAggregationFunctionExpression()) {
+          List<Expression> children = expression.getExpressions();
+          bindTypeForAggregationNonSeriesInputExpressions(
+              ((FunctionExpression) expression).getFunctionName(), children, extendedExpressions);
+          break;
+        }
       }
 
       // Calculate the Cartesian product of extendedExpressions to get the actual expressions after
@@ -528,6 +552,17 @@ public class ExpressionAnalyzer {
       for (Expression suffixExpression : predicate.getExpressions()) {
         extendedExpressions.add(
             removeWildcardInFilter(suffixExpression, prefixPaths, schemaTree, false));
+
+        // We just process first input Expression of AggregationFunction,
+        // keep other input Expressions as origin and bind Type
+        // If AggregationFunction need more than one input series,
+        // we need to reconsider the process of it
+        if (predicate.isBuiltInAggregationFunctionExpression()) {
+          List<Expression> children = predicate.getExpressions();
+          bindTypeForAggregationNonSeriesInputExpressions(
+              ((FunctionExpression) predicate).getFunctionName(), children, extendedExpressions);
+          break;
+        }
       }
       List<List<Expression>> childExpressionsList = new ArrayList<>();
       cartesianProduct(extendedExpressions, childExpressionsList, 0, new ArrayList<>());
@@ -594,6 +629,17 @@ public class ExpressionAnalyzer {
       for (Expression childExpression : expression.getExpressions()) {
         childrenExpressions.add(
             replaceRawPathWithGroupedPath(childExpression, rawPathToGroupedPathMap));
+
+        // We just process first input Expression of AggregationFunction.
+        // If AggregationFunction need more than one input series,
+        // we need to reconsider the process of it
+        if (expression.isBuiltInAggregationFunctionExpression()) {
+          List<Expression> children = expression.getExpressions();
+          for (int i = 1; i < children.size(); i++) {
+            childrenExpressions.add(children.get(i));
+          }
+          break;
+        }
       }
       return reconstructFunctionExpression((FunctionExpression) expression, childrenExpressions);
     } else if (expression instanceof TimeSeriesOperand) {
@@ -651,6 +697,17 @@ public class ExpressionAnalyzer {
             concatDeviceAndRemoveWildcard(suffixExpression, devicePath, schemaTree);
         if (concatedExpression != null && !concatedExpression.isEmpty()) {
           extendedExpressions.add(concatedExpression);
+        }
+
+        // We just process first input Expression of AggregationFunction,
+        // keep other input Expressions as origin and bind Type
+        // If AggregationFunction need more than one input series,
+        // we need to reconsider the process of it
+        if (expression.isBuiltInAggregationFunctionExpression()) {
+          List<Expression> children = expression.getExpressions();
+          bindTypeForAggregationNonSeriesInputExpressions(
+              ((FunctionExpression) expression).getFunctionName(), children, extendedExpressions);
+          break;
         }
       }
       List<List<Expression>> childExpressionsList = new ArrayList<>();
@@ -1267,8 +1324,8 @@ public class ExpressionAnalyzer {
     } else if (expression instanceof UnaryExpression) {
       return isDeviceViewNeedSpecialProcess(((UnaryExpression) expression).getExpression());
     } else if (expression instanceof FunctionExpression) {
-      if (((FunctionExpression) expression).isBuiltInScalarFunction()
-          && BuiltinScalarFunction.DEVICE_VIEW_SPECIAL_PROCESS_FUNCTIONS.contains(
+      if (((FunctionExpression) expression).isBuiltInFunction()
+          && BuiltinFunction.DEVICE_VIEW_SPECIAL_PROCESS_FUNCTIONS.contains(
               ((FunctionExpression) expression).getFunctionName().toLowerCase())) {
         return true;
       }
@@ -1280,6 +1337,40 @@ public class ExpressionAnalyzer {
       return false;
     } else if (expression instanceof LeafOperand) {
       return false;
+    } else {
+      throw new IllegalArgumentException(
+          "unsupported expression type: " + expression.getExpressionType());
+    }
+  }
+
+  public static boolean checkIsScalarExpression(Expression expression, Analysis analysis) {
+    if (expression instanceof TernaryExpression) {
+      TernaryExpression ternaryExpression = (TernaryExpression) expression;
+      return checkIsScalarExpression(ternaryExpression.getFirstExpression(), analysis)
+          && checkIsScalarExpression(ternaryExpression.getSecondExpression(), analysis)
+          && checkIsScalarExpression(ternaryExpression.getThirdExpression(), analysis);
+    } else if (expression instanceof BinaryExpression) {
+      BinaryExpression binaryExpression = (BinaryExpression) expression;
+      return checkIsScalarExpression(binaryExpression.getLeftExpression(), analysis)
+          && checkIsScalarExpression(binaryExpression.getRightExpression(), analysis);
+    } else if (expression instanceof UnaryExpression) {
+      return checkIsScalarExpression(((UnaryExpression) expression).getExpression(), analysis);
+    } else if (expression instanceof FunctionExpression) {
+      FunctionExpression functionExpression = (FunctionExpression) expression;
+      if (!functionExpression.isMappable(analysis.getExpressionTypes())
+          || BuiltinFunction.DEVICE_VIEW_SPECIAL_PROCESS_FUNCTIONS.contains(
+              functionExpression.getFunctionName())) {
+        return false;
+      }
+      List<Expression> inputExpressions = functionExpression.getExpressions();
+      for (Expression inputExpression : inputExpressions) {
+        if (!checkIsScalarExpression(inputExpression, analysis)) {
+          return false;
+        }
+      }
+      return true;
+    } else if (expression instanceof LeafOperand) {
+      return true;
     } else {
       throw new IllegalArgumentException(
           "unsupported expression type: " + expression.getExpressionType());

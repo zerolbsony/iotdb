@@ -53,6 +53,7 @@ keyWords
     | CLEAR
     | CLUSTER
     | CONCAT
+    | CONDITION
     | CONFIGNODES
     | CONFIGURATION
     | CONTINUOUS
@@ -155,6 +156,7 @@ keyWords
     | SCHEMA
     | SELECT
     | SERIESSLOTID
+    | SESSION
     | SET
     | SETTLE
     | SGLEVEL

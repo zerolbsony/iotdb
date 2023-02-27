@@ -72,6 +72,8 @@ import org.apache.iotdb.db.mpp.plan.statement.component.FillPolicy;
 import org.apache.iotdb.db.mpp.plan.statement.component.FromComponent;
 import org.apache.iotdb.db.mpp.plan.statement.component.GroupByComponent;
 import org.apache.iotdb.db.mpp.plan.statement.component.GroupByLevelComponent;
+import org.apache.iotdb.db.mpp.plan.statement.component.GroupBySeriesComponent;
+import org.apache.iotdb.db.mpp.plan.statement.component.GroupBySessionComponent;
 import org.apache.iotdb.db.mpp.plan.statement.component.GroupByTagComponent;
 import org.apache.iotdb.db.mpp.plan.statement.component.GroupByTimeComponent;
 import org.apache.iotdb.db.mpp.plan.statement.component.GroupByVariationComponent;
@@ -192,6 +194,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -214,7 +217,10 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
       "For delete statement, where clause can only contain time expressions, "
           + "value filter is not currently supported.";
 
-  private static final String IGNORINGNULL = "IgnoringNull";
+  private static final String GROUP_BY_COMMON_ONLY_ONE_MSG =
+      "Only one of group by time or group by variation/series/session can be supported at a time";
+
+  private static final String IGNORENULL = "IgnoreNull";
 
   private ZoneId zoneId;
 
@@ -933,8 +939,7 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
       for (IoTDBSqlParser.GroupByAttributeClauseContext groupByAttribute : groupByAttributes) {
         if (groupByAttribute.TIME() != null || groupByAttribute.interval != null) {
           if (groupByKeys.contains("COMMON")) {
-            throw new SemanticException(
-                "Only one of group by time or group by variation can be supported at a time");
+            throw new SemanticException(GROUP_BY_COMMON_ONLY_ONE_MSG);
           }
 
           groupByKeys.add("COMMON");
@@ -955,13 +960,28 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
           queryStatement.setGroupByTagComponent(parseGroupByTagClause(groupByAttribute));
         } else if (groupByAttribute.VARIATION() != null) {
           if (groupByKeys.contains("COMMON")) {
-            throw new SemanticException(
-                "Only one of group by time or group by variation can be supported at a time");
+            throw new SemanticException(GROUP_BY_COMMON_ONLY_ONE_MSG);
           }
 
           groupByKeys.add("COMMON");
           queryStatement.setGroupByComponent(
               parseGroupByClause(groupByAttribute, WindowType.EVENT_WINDOW));
+        } else if (groupByAttribute.CONDITION() != null) {
+          if (groupByKeys.contains("COMMON")) {
+            throw new SemanticException(GROUP_BY_COMMON_ONLY_ONE_MSG);
+          }
+
+          groupByKeys.add("COMMON");
+          queryStatement.setGroupByComponent(
+              parseGroupByClause(groupByAttribute, WindowType.SERIES_WINDOW));
+        } else if (groupByAttribute.SESSION() != null) {
+          if (groupByKeys.contains("COMMON")) {
+            throw new SemanticException(GROUP_BY_COMMON_ONLY_ONE_MSG);
+          }
+
+          groupByKeys.add("COMMON");
+          queryStatement.setGroupByComponent(
+              parseGroupByClause(groupByAttribute, WindowType.SESSION_WINDOW));
         } else {
           throw new SemanticException("Unknown GROUP BY type.");
         }
@@ -1185,19 +1205,35 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
 
     boolean ignoringNull = true;
     if (ctx.attributePair() != null && !ctx.attributePair().isEmpty()) {
-      if (ctx.attributePair().key.getText().equalsIgnoreCase(IGNORINGNULL)) {
+      if (ctx.attributePair().key.getText().equalsIgnoreCase(IGNORENULL)) {
         ignoringNull = Boolean.parseBoolean(ctx.attributePair().value.getText());
       }
     }
-
+    List<ExpressionContext> expressions = ctx.expression();
     if (windowType == WindowType.EVENT_WINDOW) {
+      ExpressionContext expressionContext = expressions.get(0);
       GroupByVariationComponent groupByVariationComponent = new GroupByVariationComponent();
       groupByVariationComponent.setControlColumnExpression(
-          parseExpression(ctx.expression(), ctx.expression().OPERATOR_NOT() == null));
+          parseExpression(expressionContext, expressionContext.OPERATOR_NOT() == null));
       groupByVariationComponent.setDelta(
           ctx.delta == null ? 0 : Double.parseDouble(ctx.delta.getText()));
       groupByVariationComponent.setIgnoringNull(ignoringNull);
       return groupByVariationComponent;
+    } else if (windowType == WindowType.SERIES_WINDOW) {
+      ExpressionContext conditionExpressionContext = expressions.get(0);
+      GroupBySeriesComponent groupBySeriesComponent = new GroupBySeriesComponent();
+      groupBySeriesComponent.setControlColumnExpression(
+          parseExpression(
+              conditionExpressionContext, conditionExpressionContext.OPERATOR_NOT() == null));
+      if (expressions.size() == 2) {
+        groupBySeriesComponent.setKeepExpression(
+            parseExpression(expressions.get(1), expressions.get(1).OPERATOR_NOT() == null));
+      }
+      groupBySeriesComponent.setIgnoringNull(ignoringNull);
+      return groupBySeriesComponent;
+    } else if (windowType == WindowType.SESSION_WINDOW) {
+      long interval = DateTimeUtils.convertDurationStrToLong(ctx.timeInterval.getText());
+      return new GroupBySessionComponent(interval);
     } else {
       throw new SemanticException("Unsupported window type");
     }
@@ -1300,12 +1336,12 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
   }
 
   // parse LIMIT & OFFSET
-  private int parseLimitClause(IoTDBSqlParser.LimitClauseContext ctx) {
-    int limit;
+  private long parseLimitClause(IoTDBSqlParser.LimitClauseContext ctx) {
+    long limit;
     try {
-      limit = Integer.parseInt(ctx.INTEGER_LITERAL().getText());
+      limit = Long.parseLong(ctx.INTEGER_LITERAL().getText());
     } catch (NumberFormatException e) {
-      throw new SemanticException("Out of range. LIMIT <N>: N should be Int32.");
+      throw new SemanticException("Out of range. LIMIT <N>: N should be Int64.");
     }
     if (limit <= 0) {
       throw new SemanticException("LIMIT <N>: N should be greater than 0.");
@@ -1313,13 +1349,13 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
     return limit;
   }
 
-  private int parseOffsetClause(IoTDBSqlParser.OffsetClauseContext ctx) {
-    int offset;
+  private long parseOffsetClause(IoTDBSqlParser.OffsetClauseContext ctx) {
+    long offset;
     try {
-      offset = Integer.parseInt(ctx.INTEGER_LITERAL().getText());
+      offset = Long.parseLong(ctx.INTEGER_LITERAL().getText());
     } catch (NumberFormatException e) {
       throw new SemanticException(
-          "Out of range. OFFSET <OFFSETValue>: OFFSETValue should be Int32.");
+          "Out of range. OFFSET <OFFSETValue>: OFFSETValue should be Int64.");
     }
     if (offset < 0) {
       throw new SemanticException("OFFSET <OFFSETValue>: OFFSETValue should >= 0.");
@@ -1620,8 +1656,8 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
     }
   }
 
-  private void checkIdentifier(String src) {
-    if (!TsFileConstant.IDENTIFIER_PATTERN.matcher(src).matches()) {
+  private static void checkIdentifier(String src) {
+    if (!TsFileConstant.IDENTIFIER_PATTERN.matcher(src).matches() || PathUtils.isRealNumber(src)) {
       throw new SemanticException(
           String.format(
               "%s is illegal, identifier not enclosed with backticks can only consist of digits, characters and underscore.",
@@ -1697,7 +1733,7 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
     return src;
   }
 
-  private String parseIdentifier(String src) {
+  public static String parseIdentifier(String src) {
     if (src.startsWith(TsFileConstant.BACK_QUOTE_STRING)
         && src.endsWith(TsFileConstant.BACK_QUOTE_STRING)) {
       return src.substring(1, src.length() - 1)
@@ -2318,7 +2354,73 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
           "Invalid function expression, all the arguments are constant operands: "
               + functionClause.getText());
     }
+
+    // check size of input expressions
+    // type check of input expressions is put in ExpressionTypeAnalyzer
+    if (functionExpression.isBuiltInAggregationFunctionExpression()) {
+      checkAggregationFunctionInput(functionExpression);
+    } else if (functionExpression.isBuiltInFunction()) {
+      checkBuiltInFunctionInput(functionExpression);
+    }
     return functionExpression;
+  }
+
+  private void checkAggregationFunctionInput(FunctionExpression functionExpression) {
+    final String functionName = functionExpression.getFunctionName().toLowerCase();
+    switch (functionName) {
+      case SqlConstant.MIN_TIME:
+      case SqlConstant.MAX_TIME:
+      case SqlConstant.COUNT:
+      case SqlConstant.MIN_VALUE:
+      case SqlConstant.LAST_VALUE:
+      case SqlConstant.FIRST_VALUE:
+      case SqlConstant.MAX_VALUE:
+      case SqlConstant.EXTREME:
+      case SqlConstant.AVG:
+      case SqlConstant.SUM:
+        checkFunctionExpressionInputSize(
+            functionExpression.getExpressionString(),
+            functionExpression.getExpressions().size(),
+            1);
+        return;
+      case SqlConstant.COUNT_IF:
+        checkFunctionExpressionInputSize(
+            functionExpression.getExpressionString(),
+            functionExpression.getExpressions().size(),
+            2);
+        return;
+      default:
+        throw new IllegalArgumentException(
+            "Invalid Aggregation function: " + functionExpression.getFunctionName());
+    }
+  }
+
+  private void checkBuiltInFunctionInput(FunctionExpression functionExpression) {
+    final String functionName = functionExpression.getFunctionName().toLowerCase();
+    switch (functionName) {
+      case SqlConstant.DIFF:
+        checkFunctionExpressionInputSize(
+            functionExpression.getExpressionString(),
+            functionExpression.getExpressions().size(),
+            1);
+        return;
+      default:
+        throw new IllegalArgumentException(
+            "Invalid BuiltInFunction: " + functionExpression.getFunctionName());
+    }
+  }
+
+  private void checkFunctionExpressionInputSize(
+      String expressionString, int actual, int... expected) {
+    for (int expect : expected) {
+      if (expect == actual) {
+        return;
+      }
+    }
+    throw new SemanticException(
+        String.format(
+            "Error size of input expressions. expression: %s, actual size: %s, expected size: %s.",
+            expressionString, actual, Arrays.toString(expected)));
   }
 
   private Expression parseRegularExpression(ExpressionContext context, boolean inWithoutNull) {
@@ -2674,7 +2776,7 @@ public class ASTVisitor extends IoTDBSqlParserBaseVisitor<Statement> {
 
   @Override
   public Statement visitCreateSchemaTemplate(IoTDBSqlParser.CreateSchemaTemplateContext ctx) {
-    String name = parseIdentifier(parseIdentifier(ctx.templateName.getText()));
+    String name = parseIdentifier(ctx.templateName.getText());
     List<List<String>> measurementsList = new ArrayList<>();
     List<List<TSDataType>> dataTypesList = new ArrayList<>();
     List<List<TSEncoding>> encodingsList = new ArrayList<>();

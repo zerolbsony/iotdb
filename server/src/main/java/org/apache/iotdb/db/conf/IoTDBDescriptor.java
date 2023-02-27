@@ -541,6 +541,15 @@ public class IoTDBDescriptor {
       conf.setQueryThreadCount(Runtime.getRuntime().availableProcessors());
     }
 
+    conf.setDegreeOfParallelism(
+        Integer.parseInt(
+            properties.getProperty(
+                "degree_of_query_parallelism", Integer.toString(conf.getDegreeOfParallelism()))));
+
+    if (conf.getDegreeOfParallelism() <= 0) {
+      conf.setDegreeOfParallelism(Runtime.getRuntime().availableProcessors() / 2);
+    }
+
     conf.setMaxAllowedConcurrentQueries(
         Integer.parseInt(
             properties.getProperty(
@@ -636,6 +645,11 @@ public class IoTDBDescriptor {
             properties.getProperty(
                 "enable_compaction_validation",
                 Boolean.toString(conf.isEnableCompactionValidation()))));
+    conf.setCandidateCompactionTaskQueueSize(
+        Integer.parseInt(
+            properties.getProperty(
+                "candidate_compaction_task_queue_size",
+                Integer.toString(conf.getCandidateCompactionTaskQueueSize()))));
 
     conf.setEnablePartialInsert(
         Boolean.parseBoolean(

@@ -318,6 +318,8 @@ public class IoTDBConfig {
   /** How many threads can concurrently execute query statement. When <= 0, use CPU core number. */
   private int queryThreadCount = Runtime.getRuntime().availableProcessors();
 
+  private int degreeOfParallelism = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
+
   /** How many queries can be concurrently executed. When <= 0, use 1000. */
   private int maxAllowedConcurrentQueries = 1000;
 
@@ -466,6 +468,12 @@ public class IoTDBConfig {
   /** The max total size of candidate files in cross space compaction */
   private long maxCrossCompactionCandidateFileSize = 1024 * 1024 * 1024 * 5L;
 
+  /**
+   * Only the unseq files whose level of inner space compaction reaches this value can be selected
+   * to participate in the cross space compaction.
+   */
+  private int minCrossCompactionUnseqFileLevel = 1;
+
   /** The interval of compaction task schedulation in each virtual database. The unit is ms. */
   private long compactionScheduleIntervalInMs = 60_000L;
 
@@ -479,6 +487,9 @@ public class IoTDBConfig {
   private int subCompactionTaskNum = 4;
 
   private boolean enableCompactionValidation = true;
+
+  /** The size of candidate compaction task queue. */
+  private int candidateCompactionTaskQueueSize = 50;
 
   /** whether to cache meta data(ChunkMetaData and TsFileMetaData) or not. */
   private boolean metaDataCacheEnable = true;
@@ -979,8 +990,8 @@ public class IoTDBConfig {
   /** Maximum wait time of write cache in IoTConsensus. Unit: ms */
   private long cacheWindowTimeInMs = 10 * 1000L;
 
-  private long dataRatisConsensusLogAppenderBufferSizeMax = 4 * 1024 * 1024L;
-  private long schemaRatisConsensusLogAppenderBufferSizeMax = 4 * 1024 * 1024L;
+  private long dataRatisConsensusLogAppenderBufferSizeMax = 16 * 1024 * 1024L;
+  private long schemaRatisConsensusLogAppenderBufferSizeMax = 16 * 1024 * 1024L;
 
   private long dataRatisConsensusSnapshotTriggerThreshold = 400000L;
   private long schemaRatisConsensusSnapshotTriggerThreshold = 400000L;
@@ -1461,6 +1472,14 @@ public class IoTDBConfig {
 
   public void setQueryThreadCount(int queryThreadCount) {
     this.queryThreadCount = queryThreadCount;
+  }
+
+  public void setDegreeOfParallelism(int degreeOfParallelism) {
+    this.degreeOfParallelism = degreeOfParallelism;
+  }
+
+  public int getDegreeOfParallelism() {
+    return degreeOfParallelism;
   }
 
   public int getMaxAllowedConcurrentQueries() {
@@ -2779,6 +2798,14 @@ public class IoTDBConfig {
     this.maxCrossCompactionCandidateFileSize = maxCrossCompactionCandidateFileSize;
   }
 
+  public int getMinCrossCompactionUnseqFileLevel() {
+    return minCrossCompactionUnseqFileLevel;
+  }
+
+  public void setMinCrossCompactionUnseqFileLevel(int minCrossCompactionUnseqFileLevel) {
+    this.minCrossCompactionUnseqFileLevel = minCrossCompactionUnseqFileLevel;
+  }
+
   public long getCompactionSubmissionIntervalInMs() {
     return compactionSubmissionIntervalInMs;
   }
@@ -3570,6 +3597,14 @@ public class IoTDBConfig {
 
   public void setEnableCompactionValidation(boolean enableCompactionValidation) {
     this.enableCompactionValidation = enableCompactionValidation;
+  }
+
+  public int getCandidateCompactionTaskQueueSize() {
+    return candidateCompactionTaskQueueSize;
+  }
+
+  public void setCandidateCompactionTaskQueueSize(int candidateCompactionTaskQueueSize) {
+    this.candidateCompactionTaskQueueSize = candidateCompactionTaskQueueSize;
   }
 
   public boolean isEnableAuditLog() {
