@@ -162,12 +162,16 @@ public class ShuffleSinkHandle implements ISinkHandle {
       return;
     }
     LOGGER.debug("[StartAbortShuffleSinkHandle]");
+    boolean abortFailed = false;
     for (ISink channel : downStreamChannelList) {
       try {
         channel.abort();
       } catch (Exception e) {
-        LOGGER.warn("Error occurred when try to abort channel.");
+        abortFailed = true;
       }
+    }
+    if (abortFailed) {
+      LOGGER.warn("Error occurred when try to abort channel.");
     }
     aborted = true;
     sinkListener.onAborted(this);
