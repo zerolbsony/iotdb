@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -17,19 +17,15 @@
  * under the License.
  */
 
-package org.apache.iotdb.db.client;
+package org.apache.iotdb.db.metadata.schemaregion;
 
-import org.apache.iotdb.commons.client.IClientManager;
-import org.apache.iotdb.commons.consensus.ConfigRegionId;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-public class ConfigNodeClientManager {
-  private static final class ConfigNodeClientManagerHolder {
-    private static final IClientManager<ConfigRegionId, ConfigNodeClient> INSTANCE =
-        new IClientManager.Factory<ConfigRegionId, ConfigNodeClient>()
-            .createClientManager(new DataNodeClientPoolFactory.ConfigNodeClientPoolFactory());
-  }
-
-  public static IClientManager<ConfigRegionId, ConfigNodeClient> getInstance() {
-    return ConfigNodeClientManagerHolder.INSTANCE;
-  }
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface SchemaRegion {
+  String mode();
 }

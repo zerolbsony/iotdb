@@ -17,18 +17,20 @@
  * under the License.
  */
 
-package org.apache.iotdb.commons.consensus;
+package org.apache.iotdb.db.metadata.schemaregion;
 
-import org.apache.iotdb.common.rpc.thrift.TConsensusGroupType;
+import org.apache.iotdb.commons.consensus.SchemaRegionId;
+import org.apache.iotdb.commons.path.PartialPath;
+import org.apache.iotdb.db.metadata.rescon.ISchemaEngineStatistics;
+import org.apache.iotdb.external.api.ISeriesNumerMonitor;
 
-public class ConfigNodeRegionId extends ConsensusGroupId {
+public interface ISchemaRegionParams {
 
-  public ConfigNodeRegionId(int id) {
-    this.id = id;
-  }
+  PartialPath getDatabase();
 
-  @Override
-  public TConsensusGroupType getType() {
-    return TConsensusGroupType.ConfigNodeRegion;
-  }
+  SchemaRegionId getSchemaRegionId();
+
+  ISchemaEngineStatistics getSchemaEngineStatistics();
+
+  ISeriesNumerMonitor getSeriesNumberMonitor();
 }

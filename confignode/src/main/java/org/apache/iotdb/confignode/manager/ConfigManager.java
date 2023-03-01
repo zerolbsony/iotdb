@@ -59,7 +59,6 @@ import org.apache.iotdb.confignode.consensus.request.read.region.GetRegionInfoLi
 import org.apache.iotdb.confignode.consensus.request.write.confignode.RemoveConfigNodePlan;
 import org.apache.iotdb.confignode.consensus.request.write.datanode.RegisterDataNodePlan;
 import org.apache.iotdb.confignode.consensus.request.write.datanode.RemoveDataNodePlan;
-import org.apache.iotdb.confignode.consensus.request.write.datanode.UpdateDataNodePlan;
 import org.apache.iotdb.confignode.consensus.request.write.storagegroup.DatabaseSchemaPlan;
 import org.apache.iotdb.confignode.consensus.request.write.storagegroup.SetDataReplicationFactorPlan;
 import org.apache.iotdb.confignode.consensus.request.write.storagegroup.SetSchemaReplicationFactorPlan;
@@ -80,7 +79,7 @@ import org.apache.iotdb.confignode.consensus.response.partition.RegionInfoListRe
 import org.apache.iotdb.confignode.consensus.response.partition.SchemaNodeManagementResp;
 import org.apache.iotdb.confignode.consensus.response.partition.SchemaPartitionResp;
 import org.apache.iotdb.confignode.consensus.response.template.TemplateSetInfoResp;
-import org.apache.iotdb.confignode.consensus.statemachine.ConfigNodeRegionStateMachine;
+import org.apache.iotdb.confignode.consensus.statemachine.ConfigRegionStateMachine;
 import org.apache.iotdb.confignode.manager.consensus.ConsensusManager;
 import org.apache.iotdb.confignode.manager.cq.CQManager;
 import org.apache.iotdb.confignode.manager.load.LoadManager;
@@ -230,7 +229,7 @@ public class ConfigManager implements IManager {
   /** ML Model */
   private final ModelManager modelManager;
 
-  private final ConfigNodeRegionStateMachine stateMachine;
+  private final ConfigRegionStateMachine stateMachine;
 
   private final RetryFailedTasksThread retryFailedTasksThread;
 
@@ -262,7 +261,7 @@ public class ConfigManager implements IManager {
             syncInfo,
             cqInfo,
             modelInfo);
-    this.stateMachine = new ConfigNodeRegionStateMachine(this, executor);
+    this.stateMachine = new ConfigRegionStateMachine(this, executor);
 
     // Build the manager module
     this.nodeManager = new NodeManager(this, nodeInfo);
@@ -351,7 +350,7 @@ public class ConfigManager implements IManager {
               req.getDataNodeConfiguration().getLocation(),
               this);
       if (status.getCode() == TSStatusCode.SUCCESS_STATUS.getStatusCode()) {
-        return nodeManager.restartDataNode(req.getDataNodeConfiguration().getLocation());
+        return nodeManager.updateDataNodeIfNecessary(req.getDataNodeConfiguration());
       }
     }
 
@@ -370,20 +369,6 @@ public class ConfigManager implements IManager {
       dataSet.setStatus(status);
       return dataSet;
     }
-  }
-
-  @Override
-  public DataSet updateDataNode(UpdateDataNodePlan updateDataNodePlan) {
-    TSStatus status = confirmLeader();
-    DataNodeRegisterResp dataSet;
-    if (status.getCode() == TSStatusCode.SUCCESS_STATUS.getStatusCode()) {
-      dataSet = (DataNodeRegisterResp) nodeManager.updateDataNode(updateDataNodePlan);
-    } else {
-      dataSet = new DataNodeRegisterResp();
-      dataSet.setStatus(status);
-      dataSet.setConfigNodeList(nodeManager.getRegisteredConfigNodes());
-    }
-    return dataSet;
   }
 
   @Override

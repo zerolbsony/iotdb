@@ -30,7 +30,7 @@ import org.apache.iotdb.commons.client.ThriftClient;
 import org.apache.iotdb.commons.client.factory.ThriftClientFactory;
 import org.apache.iotdb.commons.client.property.ThriftClientProperty;
 import org.apache.iotdb.commons.client.sync.SyncThriftClientWithErrorHandler;
-import org.apache.iotdb.commons.consensus.ConfigNodeRegionId;
+import org.apache.iotdb.commons.consensus.ConfigRegionId;
 import org.apache.iotdb.confignode.rpc.thrift.IConfigNodeRPCService;
 import org.apache.iotdb.confignode.rpc.thrift.TAddConsensusGroupReq;
 import org.apache.iotdb.confignode.rpc.thrift.TAuthorizerReq;
@@ -53,7 +53,6 @@ import org.apache.iotdb.confignode.rpc.thrift.TDataNodeRemoveReq;
 import org.apache.iotdb.confignode.rpc.thrift.TDataNodeRemoveResp;
 import org.apache.iotdb.confignode.rpc.thrift.TDataNodeRestartReq;
 import org.apache.iotdb.confignode.rpc.thrift.TDataNodeRestartResp;
-import org.apache.iotdb.confignode.rpc.thrift.TDataNodeUpdateReq;
 import org.apache.iotdb.confignode.rpc.thrift.TDataPartitionReq;
 import org.apache.iotdb.confignode.rpc.thrift.TDataPartitionTableResp;
 import org.apache.iotdb.confignode.rpc.thrift.TDatabaseSchema;
@@ -164,9 +163,9 @@ public class ConfigNodeClient implements IConfigNodeRPCService.Iface, ThriftClie
 
   private final IoTDBConfig config = IoTDBDescriptor.getInstance().getConfig();
 
-  ClientManager<ConfigNodeRegionId, ConfigNodeClient> clientManager;
+  ClientManager<ConfigRegionId, ConfigNodeClient> clientManager;
 
-  ConfigNodeRegionId configNodeRegionId = ConfigNodeInfo.configNodeRegionId;
+  ConfigRegionId configRegionId = ConfigNodeInfo.CONFIG_REGION_ID;
 
   TProtocolFactory protocolFactory;
 
@@ -174,7 +173,7 @@ public class ConfigNodeClient implements IConfigNodeRPCService.Iface, ThriftClie
       List<TEndPoint> configNodes,
       TProtocolFactory protocolFactory,
       long connectionTimeout,
-      ClientManager<ConfigNodeRegionId, ConfigNodeClient> clientManager)
+      ClientManager<ConfigRegionId, ConfigNodeClient> clientManager)
       throws TException {
     this.configNodes = configNodes;
     this.protocolFactory = protocolFactory;
@@ -271,7 +270,7 @@ public class ConfigNodeClient implements IConfigNodeRPCService.Iface, ThriftClie
 
   @Override
   public void close() {
-    clientManager.returnClient(configNodeRegionId, this);
+    clientManager.returnClient(configRegionId, this);
   }
 
   @Override
@@ -281,7 +280,7 @@ public class ConfigNodeClient implements IConfigNodeRPCService.Iface, ThriftClie
 
   @Override
   public void invalidateAll() {
-    clientManager.clear(ConfigNodeInfo.configNodeRegionId);
+    clientManager.clear(ConfigNodeInfo.CONFIG_REGION_ID);
   }
 
   private boolean updateConfigNodeLeader(TSStatus status) {
@@ -386,22 +385,6 @@ public class ConfigNodeClient implements IConfigNodeRPCService.Iface, ThriftClie
             configNode,
             config.getAddressAndPort(),
             Thread.currentThread().getStackTrace()[1].getMethodName());
-        configLeader = null;
-      }
-      waitAndReconnect();
-    }
-    throw new TException(MSG_RECONNECTION_FAIL);
-  }
-
-  @Override
-  public TDataNodeRegisterResp updateDataNode(TDataNodeUpdateReq req) throws TException {
-    for (int i = 0; i < RETRY_NUM; i++) {
-      try {
-        TDataNodeRegisterResp resp = client.updateDataNode(req);
-        if (!updateConfigNodeLeader(resp.status)) {
-          return resp;
-        }
-      } catch (TException e) {
         configLeader = null;
       }
       waitAndReconnect();
@@ -1970,22 +1953,22 @@ public class ConfigNodeClient implements IConfigNodeRPCService.Iface, ThriftClie
     throw new TException(new UnsupportedOperationException().getCause());
   }
 
-  public static class Factory extends ThriftClientFactory<ConfigNodeRegionId, ConfigNodeClient> {
+  public static class Factory extends ThriftClientFactory<ConfigRegionId, ConfigNodeClient> {
 
     public Factory(
-        ClientManager<ConfigNodeRegionId, ConfigNodeClient> clientManager,
+        ClientManager<ConfigRegionId, ConfigNodeClient> clientManager,
         ThriftClientProperty thriftClientProperty) {
       super(clientManager, thriftClientProperty);
     }
 
     @Override
     public void destroyObject(
-        ConfigNodeRegionId configNodeRegionId, PooledObject<ConfigNodeClient> pooledObject) {
+        ConfigRegionId configRegionId, PooledObject<ConfigNodeClient> pooledObject) {
       pooledObject.getObject().invalidate();
     }
 
     @Override
-    public PooledObject<ConfigNodeClient> makeObject(ConfigNodeRegionId configNodeRegionId)
+    public PooledObject<ConfigNodeClient> makeObject(ConfigRegionId configRegionId)
         throws Exception {
       return new DefaultPooledObject<>(
           SyncThriftClientWithErrorHandler.newErrorHandler(
@@ -2000,7 +1983,7 @@ public class ConfigNodeClient implements IConfigNodeRPCService.Iface, ThriftClie
 
     @Override
     public boolean validateObject(
-        ConfigNodeRegionId configNodeRegionId, PooledObject<ConfigNodeClient> pooledObject) {
+        ConfigRegionId configRegionId, PooledObject<ConfigNodeClient> pooledObject) {
       return Optional.ofNullable(pooledObject.getObject().getTransport())
           .map(TTransport::isOpen)
           .orElse(false);
