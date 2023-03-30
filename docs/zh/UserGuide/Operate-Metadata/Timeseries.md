@@ -72,8 +72,8 @@ IoTDB> CREATE ALIGNED TIMESERIES root.ln.wf01.GPS(latitude FLOAT encoding=PLAIN 
 ```
 IoTDB> delete timeseries root.ln.wf01.wt01.status
 IoTDB> delete timeseries root.ln.wf01.wt01.temperature, root.ln.wf02.wt02.hardware
-IoTDB> delete timeseries root.ln.wf02.*
-IoTDB> drop timeseries root.ln.wf02.*
+IoTDB> delete timeseries root.ln.wf02.**
+IoTDB> drop timeseries root.ln.wf02.**
 ```
 
 ## 查看时间序列
