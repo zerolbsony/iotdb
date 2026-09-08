@@ -301,7 +301,9 @@ public class DataPartitionTableIntegrityCheckProcedure
 
         // Merge with existing timeslots (take minimum)
         for (Map.Entry<String, Long> entry : nodeTimeslots.entrySet()) {
-          earliestTimeslots.merge(entry.getKey(), entry.getValue(), Math::min);
+          if (entry.getKey().startsWith("root.")) {
+            earliestTimeslots.merge(entry.getKey(), entry.getValue(), Math::min);
+          }
         }
 
         if (LOG.isDebugEnabled()) {
@@ -357,6 +359,10 @@ public class DataPartitionTableIntegrityCheckProcedure
       String database = entry.getKey();
       long earliestTimeslot = entry.getValue();
 
+      if (!database.startsWith("root.")) {
+        continue;
+      }
+
       // Get current DataPartitionTable from ConfigManager
       Map<String, Map<TSeriesPartitionSlot, Map<TTimePartitionSlot, List<TConsensusGroupId>>>>
           localDataPartitionTable;
@@ -372,10 +378,9 @@ public class DataPartitionTableIntegrityCheckProcedure
 
       // Check if ConfigNode has a data partition that is associated with the earliestTimeslot
       if ((localDataPartitionTable == null
-              || localDataPartitionTable.isEmpty()
-              || localDataPartitionTable.get(database) == null
-              || localDataPartitionTable.get(database).isEmpty())
-          && database.startsWith("root.")) {
+          || localDataPartitionTable.isEmpty()
+          || localDataPartitionTable.get(database) == null
+          || localDataPartitionTable.get(database).isEmpty())) {
         databasesWithLostDataPartition.add(database);
         LOG.warn(
             "[DataPartitionIntegrity] No data partition table related to database {} was found from the ConfigNode, and this issue needs to be repaired",
